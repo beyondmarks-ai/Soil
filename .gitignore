@@ -1,0 +1,26 @@
+# Node / Next.js
+**/node_modules/
+**/.next/
+**/out/
+**/*.tsbuildinfo
+npm-debug.log*
+
+# Local package and temporary caches
+.npm-cache/
+.npm-temp/
+.edge-*/
+.pptx_review/
+
+# Generated previews and runtime data
+.dashboard-*.png
+smart-agri-dashboard/data/live-sensors.json
+
+# Local firmware backups
+esp32_firmware_backup*.bin
+esp32_backup_chunk*.bin
+
+# OS and editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

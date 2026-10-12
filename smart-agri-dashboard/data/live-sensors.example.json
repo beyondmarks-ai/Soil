@@ -1,0 +1,12 @@
+{
+  "soilRaw": 672,
+  "soilPercent": 0,
+  "temperature": 31.7,
+  "humidity": 43.2,
+  "dhtOk": true,
+  "relay": "OFF",
+  "uptimeMs": 16028,
+  "connected": true,
+  "port": "COM3",
+  "receivedAt": "2026-10-12T10:49:18.591Z"
+}
