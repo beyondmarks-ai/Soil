@@ -22,7 +22,7 @@ Live dashboard: `https://soil-agri-dashboard-617db570.azurewebsites.net` (Micros
 | Reports | CSV telemetry export and generated PDF farm summary | Implemented |
 | Blockchain | SHA-256 audit log plus tested Polygon `SensorAudit` contract | Contract ready; Amoy deployment needs test POL |
 | Monitoring | Application Insights and Log Analytics | Deployed |
-| CI/CD | GitHub Actions build, test and Azure deployment workflow | Implemented; GitHub OIDC variables must be added |
+| CI/CD | GitHub Actions build, test and Azure deployment using passwordless OIDC | Implemented |
 
 ## ESP32 wiring
 

@@ -37,9 +37,11 @@ jobs:
         run: npm ci && npm run build
       - uses: azure/login@v2
         with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          # These are resource identifiers, not credentials. Authentication uses
+          # the short-lived GitHub OIDC token and the Azure federated credential.
+          client-id: 14106b56-3375-4994-a810-e67112023f30
+          tenant-id: 16b09027-c852-4980-9d01-bd9ffc9b1276
+          subscription-id: 617db570-27f6-43a2-8d98-7b067bc2336b
       - name: Package Functions
         working-directory: azure-functions
         run: npm ci --omit=dev && zip -qr ../functions.zip dist host.json node_modules package-lock.json package.json

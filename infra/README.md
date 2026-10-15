@@ -32,4 +32,4 @@ Without them, every reading is still SHA-256 hashed and recorded in the Cosmos a
 
 ## GitHub Actions OIDC
 
-Run `./infra/setup-github-oidc.ps1`, then add its three non-secret identifiers as GitHub Actions secrets named `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, and `AZURE_SUBSCRIPTION_ID`. The workflow uses short-lived federated credentials; no Azure client secret is stored in GitHub.
+Run `./infra/setup-github-oidc.ps1` when recreating the Azure identity, then copy its three non-secret identifiers into the workflow. The checked-in workflow already contains the identifiers for this deployment and uses short-lived federated credentials; no Azure client secret is stored in GitHub.
