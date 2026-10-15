@@ -3,6 +3,7 @@
 **/.next/
 **/out/
 **/*.tsbuildinfo
+azure-functions/dist/
 npm-debug.log*
 
 # Local package and temporary caches
@@ -10,6 +11,17 @@ npm-debug.log*
 .npm-temp/
 .edge-*/
 .pptx_review/
+.pptx-review/
+**/.env
+**/.env.local
+**/local.settings.json
+esp32_azure_firmware/config.h
+azure-deploy-output.json
+infra/.settings-*.json
+infra/.github-oidc.json
+infra/.kudu-command.json
+.deploy/
+blockchain/artifacts/
 
 # Generated previews and runtime data
 .dashboard-*.png

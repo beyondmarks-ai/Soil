@@ -1,0 +1,55 @@
+name: Build and deploy Azure
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  verify-and-deploy:
+    runs-on: ubuntu-latest
+    env:
+      RESOURCE_GROUP: soil-agri-rg
+      FUNCTION_APP: soil-agri-functions-617db570
+      WEB_APP: soil-agri-dashboard-617db570
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            azure-functions/package-lock.json
+            blockchain/package-lock.json
+            smart-agri-dashboard/package-lock.json
+      - name: Verify Functions
+        working-directory: azure-functions
+        run: npm ci && npm test && npm run build
+      - name: Verify contract
+        working-directory: blockchain
+        run: npm ci && npm test && npm run compile
+      - name: Build dashboard
+        working-directory: smart-agri-dashboard
+        run: npm ci && npm run build
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      - name: Package Functions
+        working-directory: azure-functions
+        run: npm ci --omit=dev && zip -qr ../functions.zip dist host.json node_modules package-lock.json package.json
+      - name: Deploy Functions
+        run: az functionapp deployment source config-zip -g "$RESOURCE_GROUP" -n "$FUNCTION_APP" --src functions.zip --build-remote false
+      - name: Package dashboard
+        run: |
+          mkdir -p dashboard/.next
+          cp -R smart-agri-dashboard/.next/standalone/. dashboard/
+          cp -R smart-agri-dashboard/.next/static dashboard/.next/static
+          (cd dashboard && zip -qr ../dashboard.zip .)
+      - name: Deploy dashboard
+        run: az webapp deploy -g "$RESOURCE_GROUP" -n "$WEB_APP" --src-path dashboard.zip --type zip --clean true --restart true

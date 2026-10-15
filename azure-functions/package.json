@@ -1,0 +1,26 @@
+{
+  "name": "soil-agri-functions",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/src/index.js",
+  "scripts": {
+    "build": "tsc",
+    "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\"",
+    "prestart": "npm run build",
+    "start": "func start",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@azure/cosmos": "^4.10.1",
+    "@azure/functions": "^4.16.5",
+    "@azure/web-pubsub": "^1.2.0",
+    "ethers": "^6.15.0",
+    "zod": "^4.1.12"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.7.0",
+    "vitest": "^3.2.4"
+  }
+}

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { WebPubSubClient } from "@azure/web-pubsub-client";
 import type { LiveSensorData } from "../lib/sensor-types";
 
 const fallback: LiveSensorData = {
@@ -21,6 +22,7 @@ export function useLiveSensors(initialData: LiveSensorData = fallback) {
 
   useEffect(() => {
     let active = true;
+    let realtime: WebPubSubClient | undefined;
     const load = async () => {
       try {
         const response = await fetch("/api/live", { cache: "no-store" });
@@ -33,7 +35,23 @@ export function useLiveSensors(initialData: LiveSensorData = fallback) {
     };
     load();
     const timer = window.setInterval(load, 2000);
-    return () => { active = false; window.clearInterval(timer); };
+    const connectRealtime = async () => {
+      try {
+        const response = await fetch("/api/realtime?farmId=greenfield", { cache: "no-store" });
+        if (!response.ok) return;
+        const { url } = await response.json() as { url?: string };
+        if (!url || !active) return;
+        realtime = new WebPubSubClient(url, { autoRejoinGroups: true });
+        realtime.on("group-message", (event) => {
+          const payload = event.message.data as { type?: string; data?: LiveSensorData };
+          if (active && payload?.type === "telemetry" && payload.data) setData({ ...payload.data, connected: true, source: "azure", port: "Azure IoT Hub" });
+        });
+        await realtime.start();
+        await realtime.joinGroup("farm:greenfield");
+      } catch { /* Polling remains the reliable fallback. */ }
+    };
+    connectRealtime();
+    return () => { active = false; window.clearInterval(timer); realtime?.stop(); };
   }, []);
 
   return data;
