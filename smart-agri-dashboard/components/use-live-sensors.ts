@@ -54,5 +54,24 @@ export function useLiveSensors(initialData: LiveSensorData = fallback) {
     return () => { active = false; window.clearInterval(timer); realtime?.stop(); };
   }, []);
 
+  useEffect(() => {
+    if (!data.connected || data.source !== "serial") return;
+    const alert = !data.dhtOk
+      ? { code: "DHT_FAILURE", severity: "warning" as const, message: "DHT22 is not returning valid temperature and humidity readings." }
+      : data.soilPercent !== null && data.soilPercent < 25
+        ? { code: "LOW_SOIL", severity: data.soilPercent < 15 ? "critical" as const : "warning" as const, message: `Soil moisture is low at ${data.soilPercent}%. Verify calibration before watering.` }
+        : data.temperature !== null && data.temperature > 38
+          ? { code: "HIGH_TEMPERATURE", severity: data.temperature > 45 ? "critical" as const : "warning" as const, message: `Air temperature is high at ${data.temperature.toFixed(1)} C.` }
+          : null;
+    if (!alert) return;
+    const cooldownKey = `soil-agri-notification-${alert.code}`;
+    const now = Date.now();
+    const previous = Number(window.localStorage.getItem(cooldownKey) ?? 0);
+    if (now - previous < 30 * 60 * 1000) return;
+    window.localStorage.setItem(cooldownKey, String(now));
+    if ("Notification" in window && Notification.permission === "granted") new Notification(`Soil Agri: ${alert.code}`, { body: alert.message });
+    void fetch("/api/notifications", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...alert, deviceId: data.deviceId ?? "local-arduino" }) });
+  }, [data.connected, data.source, data.soilPercent, data.temperature, data.dhtOk, data.deviceId]);
+
   return data;
 }

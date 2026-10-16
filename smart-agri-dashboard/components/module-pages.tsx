@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { AlertRecord, AuditRecord, LiveSensorData } from "../lib/sensor-types";
 import type { FarmSettings } from "../lib/cloud-data";
 import { useLiveSensors } from "./use-live-sensors";
+import { NotificationControl } from "./notification-control";
 
 function EmptyState({ children }: { children: React.ReactNode }) {
   return <div className="empty-state">{children}</div>;
@@ -54,7 +55,7 @@ export function DevicesModule({ initialData }: { initialData: LiveSensorData }) 
 
 export function AlertsModule({ alerts }: { alerts: AlertRecord[] }) {
   const active = alerts.filter((alert) => !alert.resolved);
-  return <section className="section-layout"><article className="section-summary panel"><div><span className="eyebrow">Rules engine</span><h2>Farm alerts</h2><p>Warnings are generated during telemetry ingestion for dry soil, heat and sensor failures.</p></div><span className="summary-metric"><strong>{active.length}</strong><small>active alerts</small></span></article><article className="panel data-panel">{active.length ? <div className="alert-list">{active.map((alert) => <div className={`alert-row ${alert.severity}`} key={alert.id}><span className="alert-mark">!</span><span><strong>{alert.message}</strong><small>{alert.deviceId} · {new Date(alert.createdAt).toLocaleString()}</small></span><span className="status-pill warning">{alert.severity}</span></div>)}</div> : <EmptyState>No active alerts. Threshold violations will appear here automatically.</EmptyState>}</article></section>;
+  return <section className="section-layout"><article className="section-summary panel"><div><span className="eyebrow">Rules engine</span><h2>Farm alerts</h2><p>Warnings are generated for dry soil, heat and sensor failures.</p></div><span className="summary-metric"><strong>{active.length}</strong><small>active alerts</small></span></article><article className="panel data-panel"><NotificationControl/>{active.length ? <div className="alert-list">{active.map((alert) => <div className={`alert-row ${alert.severity}`} key={alert.id}><span className="alert-mark">!</span><span><strong>{alert.message}</strong><small>{alert.deviceId} · {new Date(alert.createdAt).toLocaleString()}</small></span><span className="status-pill warning">{alert.severity}</span></div>)}</div> : <EmptyState>No active alerts. Threshold violations will appear here automatically.</EmptyState>}</article></section>;
 }
 
 export function ReportsModule({ recordCount }: { recordCount: number }) {

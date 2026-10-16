@@ -1,7 +1,7 @@
 import { app, type HttpRequest, type HttpResponseInit, type InvocationContext } from "@azure/functions";
 import { z } from "zod";
 import { buildStoredTelemetry, deriveAlerts, telemetrySchema } from "./domain.js";
-import { anchorHash, container, realtime, sendDeviceCommand, sendRelayCommand } from "./services.js";
+import { anchorHash, container, realtime, sendAlertNotifications, sendDeviceCommand, sendRelayCommand } from "./services.js";
 
 function payloads(event: unknown): unknown[] {
   const values = Array.isArray(event) ? event : [event];
@@ -16,36 +16,48 @@ function payloads(event: unknown): unknown[] {
   });
 }
 
+async function ingestTelemetry(raw: unknown, context: InvocationContext) {
+  const parsed = telemetrySchema.safeParse(raw);
+  if (!parsed.success) {
+    context.warn("Discarded invalid telemetry", parsed.error.flatten());
+    return null;
+  }
+  const reading = buildStoredTelemetry(parsed.data);
+  await container("telemetry").items.upsert(reading);
+  await container("deviceState").items.upsert({ ...reading, id: reading.deviceId, type: "deviceState" });
+  for (const alert of deriveAlerts(reading)) {
+    const cutoff = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+    const { resources: recent } = await container("alerts").items.query({
+      query: "SELECT TOP 1 c.id FROM c WHERE c.deviceId = @deviceId AND c.code = @code AND c.createdAt >= @cutoff",
+      parameters: [{ name: "@deviceId", value: alert.deviceId }, { name: "@code", value: alert.code }, { name: "@cutoff", value: cutoff }],
+    }).fetchAll();
+    await container("alerts").items.upsert(alert);
+    if (!recent.length) {
+      try { await sendAlertNotifications(alert); }
+      catch (error) { context.warn("Alert notification failed", error); }
+    }
+  }
+  await realtime().group(`farm:${reading.farmId}`).sendToAll({ type: "telemetry", data: reading });
+  const anchor = await anchorHash(reading.hash, reading.id);
+  await container("audit").items.upsert({ id: reading.id, type: "audit", deviceId: reading.deviceId, farmId: reading.farmId, hash: reading.hash, telemetryId: reading.id, anchoredAt: new Date().toISOString(), ...anchor });
+  return reading;
+}
+
 app.eventHub("telemetry-ingest", {
   connection: "IOT_HUB_EVENTHUB_CONNECTION",
   eventHubName: "%IOT_HUB_EVENTHUB_NAME%",
   cardinality: "many",
   consumerGroup: "%IOT_HUB_CONSUMER_GROUP%",
   handler: async (events: unknown[], context: InvocationContext) => {
-    for (const raw of payloads(events)) {
-      const parsed = telemetrySchema.safeParse(raw);
-      if (!parsed.success) {
-        context.warn("Discarded invalid telemetry", parsed.error.flatten());
-        continue;
-      }
-      const reading = buildStoredTelemetry(parsed.data);
-      await container("telemetry").items.upsert(reading);
-      await container("deviceState").items.upsert({ ...reading, id: reading.deviceId, type: "deviceState" });
-      for (const alert of deriveAlerts(reading)) await container("alerts").items.upsert(alert);
-      await realtime().group(`farm:${reading.farmId}`).sendToAll({ type: "telemetry", data: reading });
+    for (const raw of payloads(events)) await ingestTelemetry(raw, context);
+  },
+});
 
-      const anchor = await anchorHash(reading.hash, reading.id);
-      await container("audit").items.upsert({
-        id: reading.id,
-        type: "audit",
-        deviceId: reading.deviceId,
-        farmId: reading.farmId,
-        hash: reading.hash,
-        telemetryId: reading.id,
-        anchoredAt: new Date().toISOString(),
-        ...anchor,
-      });
-    }
+app.http("local-telemetry", {
+  methods: ["POST"], authLevel: "function", route: "telemetry/local",
+  handler: async (request: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> => {
+    const reading = await ingestTelemetry(await request.json().catch(() => null), context);
+    return reading ? { status: 202, jsonBody: { accepted: true, id: reading.id, hash: reading.hash } } : { status: 400, jsonBody: { error: "Invalid telemetry" } };
   },
 });
 

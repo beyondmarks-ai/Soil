@@ -1,7 +1,7 @@
 import { ContractFactory, JsonRpcProvider, Wallet } from "ethers";
 import { compile } from "./compiler.mjs";
 
-const rpcUrl = process.env.BLOCKCHAIN_RPC_URL ?? "https://rpc-amoy.polygon.technology";
+const rpcUrl = process.env.BLOCKCHAIN_RPC_URL ?? "https://polygon-amoy-bor-rpc.publicnode.com";
 const privateKey = process.env.BLOCKCHAIN_PRIVATE_KEY;
 if (!privateKey) throw new Error("Set BLOCKCHAIN_PRIVATE_KEY to a funded Polygon Amoy wallet key.");
 

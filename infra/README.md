@@ -30,6 +30,12 @@ Deploy the contract from `blockchain/`, then configure these Function App settin
 
 Without them, every reading is still SHA-256 hashed and recorded in the Cosmos audit log with status `configured-later`.
 
+Run `./infra/setup-blockchain.ps1` to create a wallet securely in Key Vault. The script prints only its public address. Add free Polygon Amoy test POL from the faucet, then rerun it to deploy the contract and configure the Function App.
+
+## Local environment
+
+Run `./infra/configure-local-env.ps1` to generate the ignored dashboard `.env.local` from Key Vault and Azure CLI. It configures Cosmos DB, Azure Maps, Functions, Azure OpenAI, Communication Services email, serial control and Polygon RPC. Pass `-AlertPhoneTo` and `-SmsFrom` after acquiring an ACS phone number.
+
 ## GitHub Actions OIDC
 
 Run `./infra/setup-github-oidc.ps1` when recreating the Azure identity, then copy its three non-secret identifiers into the workflow. The checked-in workflow already contains the identifiers for this deployment and uses short-lived federated credentials; no Azure client secret is stored in GitHub.

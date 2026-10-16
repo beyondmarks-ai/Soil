@@ -20,7 +20,10 @@ Live dashboard: `https://soil-agri-dashboard-617db570.azurewebsites.net` (Micros
 | Security | HTTPS/TLS, Key Vault, managed identities, encrypted app settings and Entra sign-in | Implemented |
 | Weather | Azure Maps current weather using saved farm coordinates | Implemented |
 | Reports | CSV telemetry export and generated PDF farm summary | Implemented |
-| Blockchain | SHA-256 audit log plus tested Polygon `SensorAudit` contract | Contract ready; Amoy deployment needs test POL |
+| AI irrigation advice | Azure OpenAI `gpt-4.1-nano` with safety rules and supervised cycle suggestions | Implemented |
+| Notifications | Browser alerts and Azure Communication Services email with a 30-minute cooldown | Implemented |
+| SMS | ACS delivery code and environment configuration | Ready; requires an ACS sender number and recipient number |
+| Blockchain | SHA-256 audit log plus tested Polygon `SensorAudit` contract | Wallet secured in Key Vault; needs free Amoy test POL for deployment |
 | Monitoring | Application Insights and Log Analytics | Deployed |
 | CI/CD | GitHub Actions build, test and Azure deployment using passwordless OIDC | Implemented |
 
@@ -49,12 +52,13 @@ The older Arduino Uno diagnostic sketches remain available for isolated DHT22, s
 ## Local dashboard
 
 ```powershell
+./infra/configure-local-env.ps1
 cd smart-agri-dashboard
 npm ci
 npm run dev
 ```
 
-Without Azure settings, development falls back to the USB serial bridge. Set `SERIAL_PORT` when the board is not on COM3.
+The setup script creates an ignored `.env.local` containing the Azure API settings. Local development skips sign-in, auto-detects the serial port, supports USB relay commands, uploads readings to Azure history, and keeps AI, weather, email and blockchain services internet-connected.
 
 ## Azure deployment
 

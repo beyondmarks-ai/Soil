@@ -1,5 +1,7 @@
 import { CosmosClient, type Container } from "@azure/cosmos";
 import { WebPubSubServiceClient } from "@azure/web-pubsub";
+import { EmailClient } from "@azure/communication-email";
+import { SmsClient } from "@azure/communication-sms";
 import { Contract, JsonRpcProvider, Wallet } from "ethers";
 import { createHmac } from "node:crypto";
 
@@ -53,6 +55,26 @@ export async function sendDeviceCommand(deviceId: string, payload: Record<string
 
 export async function sendRelayCommand(deviceId: string, enabled: boolean) {
   return sendDeviceCommand(deviceId, { type: "relay", enabled });
+}
+
+export async function sendAlertNotifications(alert: { code: string; severity: string; message: string; deviceId: string }) {
+  const connection = process.env.AZURE_COMMUNICATION_CONNECTION_STRING;
+  if (!connection) return { email: "not-configured", sms: "not-configured" };
+  const subject = `[Soil Agri ${alert.severity.toUpperCase()}] ${alert.code}`;
+  const results: Record<string, string> = {};
+  const emailTo = process.env.ALERT_EMAIL_TO;
+  const sender = process.env.ACS_EMAIL_SENDER;
+  if (emailTo && sender) {
+    const result = await (await new EmailClient(connection).beginSend({ senderAddress: sender, recipients: { to: [{ address: emailTo }] }, content: { subject, plainText: `${alert.message}\nDevice: ${alert.deviceId}\nTime: ${new Date().toISOString()}` } })).pollUntilDone();
+    results.email = result.status;
+  } else results.email = "not-configured";
+  const phoneTo = process.env.ALERT_PHONE_TO;
+  const smsFrom = process.env.ACS_SMS_FROM;
+  if (phoneTo && smsFrom) {
+    const [result] = await new SmsClient(connection).send({ from: smsFrom, to: [phoneTo], message: `${subject}: ${alert.message}` });
+    results.sms = result?.successful ? "Succeeded" : `failed: ${result?.errorMessage ?? "unknown"}`;
+  } else results.sms = "not-configured";
+  return results;
 }
 
 const auditAbi = ["function anchor(bytes32 digest,string batchId,uint64 timestamp) external", "function exists(bytes32 digest) view returns (bool)"];

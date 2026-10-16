@@ -17,6 +17,8 @@ $webAppName = "soil-agri-dashboard-$Suffix"
 $planName = "soil-agri-plan"
 $mapsName = "soil-agri-maps-$Suffix"
 $communicationName = "soil-agri-comms-$Suffix"
+$emailServiceName = "soil-agri-email-$Suffix"
+$aiName = "soil-agri-ai-$Suffix"
 $workspaceName = "soil-agri-logs"
 $insightsName = "soil-agri-insights"
 $databaseName = "soil-agri"
@@ -89,6 +91,25 @@ if (-not (Test-AzureResource "Microsoft.Maps/accounts" $mapsName)) {
 if (-not (Test-AzureResource "Microsoft.Communication/CommunicationServices" $communicationName)) {
   az communication create -g $ResourceGroup -n $communicationName -l global --data-location "Asia Pacific" --tags $tagArgs --output none
 }
+if (-not (Test-AzureResource "Microsoft.Communication/EmailServices" $emailServiceName)) {
+  az communication email create -g $ResourceGroup -n $emailServiceName -l global --data-location "Asia Pacific" --tags $tagArgs --output none
+}
+$emailDomainCount = az communication email domain list -g $ResourceGroup --email-service-name $emailServiceName --query "[?name=='AzureManagedDomain'] | length(@)" -o tsv
+if ([int]$emailDomainCount -eq 0) {
+  az communication email domain create -g $ResourceGroup --email-service-name $emailServiceName -n AzureManagedDomain -l global --domain-management AzureManaged --user-engmnt-tracking Disabled --output none
+}
+az communication email domain wait -g $ResourceGroup --email-service-name $emailServiceName -n AzureManagedDomain --created --interval 10 --timeout 600
+$emailDomainId = az communication email domain show -g $ResourceGroup --email-service-name $emailServiceName -n AzureManagedDomain --query id -o tsv
+$emailSenderDomain = az communication email domain show -g $ResourceGroup --email-service-name $emailServiceName -n AzureManagedDomain --query fromSenderDomain -o tsv
+az communication update -g $ResourceGroup -n $communicationName --linked-domains $emailDomainId --output none
+
+if (-not (Test-AzureResource "Microsoft.CognitiveServices/accounts" $aiName)) {
+  az cognitiveservices account create -g $ResourceGroup -n $aiName -l eastus2 --kind OpenAI --sku S0 --custom-domain $aiName --yes --tags $tagArgs --output none
+}
+$aiDeploymentCount = az cognitiveservices account deployment list -g $ResourceGroup -n $aiName --query "[?name=='gpt-4.1-nano'] | length(@)" -o tsv
+if ([int]$aiDeploymentCount -eq 0) {
+  az cognitiveservices account deployment create -g $ResourceGroup -n $aiName --deployment-name gpt-4.1-nano --model-name gpt-4.1-nano --model-version 2025-04-14 --model-format OpenAI --sku-name GlobalStandard --sku-capacity 1 --output none
+}
 
 $cosmosConnection = az cosmosdb keys list -g $ResourceGroup -n $cosmosName --type connection-strings --query "connectionStrings[0].connectionString" -o tsv
 $iotEventConnection = az iot hub connection-string show -g $ResourceGroup -n $iotHubName --default-eventhub --query connectionString -o tsv
@@ -96,6 +117,9 @@ $iotServiceConnection = az iot hub connection-string show -g $ResourceGroup -n $
 $iotEventHubName = az iot hub show -g $ResourceGroup -n $iotHubName --query properties.eventHubEndpoints.events.path -o tsv
 $webPubSubConnection = az webpubsub key show -g $ResourceGroup -n $webPubSubName --query primaryConnectionString -o tsv
 $mapsKey = az maps account keys list -g $ResourceGroup -n $mapsName --query primaryKey -o tsv
+$communicationConnection = az communication list-key -g $ResourceGroup -n $communicationName --query primaryConnectionString -o tsv
+$aiEndpoint = az cognitiveservices account show -g $ResourceGroup -n $aiName --query properties.endpoint -o tsv
+$aiKey = az cognitiveservices account keys list -g $ResourceGroup -n $aiName --query key1 -o tsv
 
 $secrets = @{
   "cosmos-connection" = $cosmosConnection
@@ -103,6 +127,10 @@ $secrets = @{
   "iot-service-connection" = $iotServiceConnection
   "webpubsub-connection" = $webPubSubConnection
   "azure-maps-key" = $mapsKey
+  "communication-connection" = $communicationConnection
+  "email-sender" = "DoNotReply@$emailSenderDomain"
+  "azure-openai-endpoint" = $aiEndpoint
+  "azure-openai-key" = $aiKey
 }
 foreach ($entry in $secrets.GetEnumerator()) { az keyvault secret set --vault-name $vaultName --name $entry.Key --value $entry.Value --output none }
 
@@ -124,6 +152,9 @@ $functionSettings = [ordered]@{
   IOT_HUB_SERVICE_CONNECTION = $iotServiceConnection
   WEB_PUBSUB_CONNECTION_STRING = $webPubSubConnection
   WEB_PUBSUB_HUB = "farm"
+  AZURE_COMMUNICATION_CONNECTION_STRING = $communicationConnection
+  ACS_EMAIL_SENDER = "DoNotReply@$emailSenderDomain"
+  ALERT_EMAIL_TO = "contact@beyondmarks.ai"
   SCM_DO_BUILD_DURING_DEPLOYMENT = "true"
 }
 $functionSettingsFile = Join-Path $PSScriptRoot ".settings-functions.json"
@@ -134,6 +165,12 @@ $webSettings = [ordered]@{
   COSMOS_CONNECTION_STRING = $cosmosConnection
   COSMOS_DATABASE = $databaseName
   AZURE_MAPS_KEY = $mapsKey
+  SOIL_AZURE_OPENAI_ENDPOINT = $aiEndpoint
+  SOIL_AZURE_OPENAI_API_KEY = $aiKey
+  SOIL_AZURE_OPENAI_DEPLOYMENT = "gpt-4.1-nano"
+  AZURE_COMMUNICATION_CONNECTION_STRING = $communicationConnection
+  ACS_EMAIL_SENDER = "DoNotReply@$emailSenderDomain"
+  ALERT_EMAIL_TO = "contact@beyondmarks.ai"
   AZURE_FUNCTION_BASE_URL = "https://$functionName.azurewebsites.net"
   SCM_DO_BUILD_DURING_DEPLOYMENT = "false"
   ENABLE_ORYX_BUILD = "false"
@@ -190,6 +227,8 @@ $summary = [ordered]@{
   cosmosAccount = $cosmosName
   keyVault = $vaultName
   mapsAccount = $mapsName
+  aiAccount = $aiName
+  emailService = $emailServiceName
 }
 $summary | ConvertTo-Json | Set-Content -Encoding utf8 (Join-Path $PSScriptRoot "..\azure-deploy-output.json")
 $summary | ConvertTo-Json

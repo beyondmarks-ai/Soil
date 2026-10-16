@@ -1,4 +1,4 @@
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { SerialPort } from "serialport";
 import { ReadlineParser } from "@serialport/parser-readline";
@@ -8,13 +8,29 @@ let portPath = requestedPort ?? null;
 const baudRate = Number(process.env.SERIAL_BAUD ?? 9600);
 const dataDir = path.resolve("data");
 const dataFile = path.join(dataDir, "live-sensors.json");
+const relayCommandFile = path.join(dataDir, "relay-command.json");
 let serial;
 let retryTimer;
+let lastCloudUploadAt = 0;
 
 await mkdir(dataDir, { recursive: true });
 
 async function save(payload) {
   await writeFile(dataFile, `${JSON.stringify(payload, null, 2)}\n`, "utf8");
+}
+
+async function uploadToAzure(reading) {
+  const base = process.env.AZURE_FUNCTION_BASE_URL;
+  const key = process.env.AZURE_FUNCTION_KEY;
+  if (!base || !key || Date.now() - lastCloudUploadAt < 10000) return;
+  lastCloudUploadAt = Date.now();
+  try {
+    const response = await fetch(`${base.replace(/\/$/, "")}/api/telemetry/local?code=${encodeURIComponent(key)}`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ deviceId: "arduino-local-01", farmId: "greenfield", firmwareVersion: "uno-usb-1.0", ...reading }),
+    });
+    if (!response.ok) console.error(`[serial] Azure upload rejected: ${response.status}`);
+  } catch (error) { console.error(`[serial] Azure upload failed: ${error.message}`); }
 }
 
 async function markDisconnected(message) {
@@ -54,6 +70,7 @@ async function connect() {
     try {
       const reading = JSON.parse(text);
       await save({ ...reading, connected: true, port: portPath, receivedAt: new Date().toISOString() });
+      void uploadToAzure(reading);
     } catch (error) {
       console.error("[serial] Invalid sensor line:", error.message);
     }
@@ -82,6 +99,21 @@ function shutdown() {
   if (serial?.isOpen) serial.close(() => process.exit(0));
   else process.exit(0);
 }
+
+const commandTimer = setInterval(async () => {
+  if (!serial?.isOpen) return;
+  try {
+    const command = JSON.parse(await readFile(relayCommandFile, "utf8"));
+    if (typeof command.enabled !== "boolean") return;
+    serial.write(command.enabled ? "RELAY_ON\n" : "RELAY_OFF\n");
+    await unlink(relayCommandFile);
+    console.log(`[serial] Relay command sent: ${command.enabled ? "ON" : "OFF"}`);
+  } catch (error) {
+    if (error?.code !== "ENOENT") console.error(`[serial] Relay command failed: ${error.message}`);
+  }
+}, 500);
+
+process.on("exit", () => clearInterval(commandTimer));
 
 process.on("SIGINT", shutdown);
 process.on("SIGTERM", shutdown);

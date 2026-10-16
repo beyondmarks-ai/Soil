@@ -14,18 +14,21 @@ npm-debug.log*
 .pptx-review/
 **/.env
 **/.env.local
+**/.env.*.local
 **/local.settings.json
 esp32_azure_firmware/config.h
 azure-deploy-output.json
 infra/.settings-*.json
 infra/.github-oidc.json
 infra/.kudu-command.json
+infra/.settings-blockchain.json
 .deploy/
 blockchain/artifacts/
 
 # Generated previews and runtime data
 .dashboard-*.png
 smart-agri-dashboard/data/live-sensors.json
+smart-agri-dashboard/data/relay-command.json
 
 # Local firmware backups
 esp32_firmware_backup*.bin

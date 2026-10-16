@@ -1,5 +1,9 @@
 import { spawn } from "node:child_process";
 import path from "node:path";
+import nextEnv from "@next/env";
+
+const { loadEnvConfig } = nextEnv;
+loadEnvConfig(process.cwd());
 
 const node = process.execPath;
 const nextBin = path.resolve("node_modules", "next", "dist", "bin", "next");
