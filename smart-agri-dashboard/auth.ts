@@ -2,6 +2,7 @@ import NextAuth from "next-auth";
 import MicrosoftEntraID from "next-auth/providers/microsoft-entra-id";
 
 const tenantId = process.env.AUTH_MICROSOFT_ENTRA_ID_TENANT_ID;
+const authenticationDisabled = process.env.NODE_ENV !== "production" || process.env.DISABLE_AUTH === "true";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   trustHost: true,
@@ -14,6 +15,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     }),
   ],
   callbacks: {
-    authorized: ({ auth }) => Boolean(auth?.user),
+    authorized: ({ auth }) => authenticationDisabled || Boolean(auth?.user),
   },
 });

@@ -3,7 +3,8 @@ import path from "node:path";
 import { SerialPort } from "serialport";
 import { ReadlineParser } from "@serialport/parser-readline";
 
-const portPath = process.env.SERIAL_PORT ?? "COM3";
+const requestedPort = process.env.SERIAL_PORT;
+let portPath = requestedPort ?? null;
 const baudRate = Number(process.env.SERIAL_BAUD ?? 9600);
 const dataDir = path.resolve("data");
 const dataFile = path.join(dataDir, "live-sensors.json");
@@ -20,17 +21,30 @@ async function markDisconnected(message) {
   await save({
     soilRaw: null, soilPercent: null, temperature: null, humidity: null,
     dhtOk: false, relay: "OFF", uptimeMs: null, connected: false,
-    port: portPath, receivedAt: null, message,
+    port: portPath ?? "Auto-detect", receivedAt: null, message,
   });
 }
 
 function scheduleRetry() {
   clearTimeout(retryTimer);
-  retryTimer = setTimeout(connect, 3000);
+  retryTimer = setTimeout(() => void connect(), 3000);
 }
 
-function connect() {
+async function detectPort() {
+  const ports = await SerialPort.list();
+  if (requestedPort) return ports.some((port) => port.path === requestedPort) ? requestedPort : null;
+  const recognizable = ports.find((port) => /arduino|usb|wch|ch340|cp210|ftdi/i.test(`${port.manufacturer ?? ""} ${port.friendlyName ?? ""} ${port.pnpId ?? ""}`));
+  return recognizable?.path ?? ports[0]?.path ?? null;
+}
+
+async function connect() {
   if (serial?.isOpen) return;
+  portPath = await detectPort();
+  if (!portPath) {
+    await markDisconnected("No Arduino or ESP serial port detected");
+    scheduleRetry();
+    return;
+  }
   serial = new SerialPort({ path: portPath, baudRate, autoOpen: false });
   const parser = serial.pipe(new ReadlineParser({ delimiter: "\n" }));
 
@@ -71,4 +85,4 @@ function shutdown() {
 
 process.on("SIGINT", shutdown);
 process.on("SIGTERM", shutdown);
-connect();
+void connect();
