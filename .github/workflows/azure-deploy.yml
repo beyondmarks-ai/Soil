@@ -34,7 +34,7 @@ jobs:
         run: npm ci && npm test && npm run compile
       - name: Build dashboard
         working-directory: smart-agri-dashboard
-        run: npm ci && npm run build
+        run: npm ci && npm run lint && npm run build
       - uses: azure/login@v2
         with:
           # These are resource identifiers, not credentials. Authentication uses
