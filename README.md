@@ -79,3 +79,10 @@ cd ..\smart-agri-dashboard; npm ci; npm run lint; npm run build
 ```
 
 The source presentation is retained as `Blockchain_IoT_Smart_Agriculture_Colorful_Review (1).pptx`.
+
+<!-- beyond-marks-credit:start -->
+---
+### Built by Beyond Marks AI Academy
+
+Developed by **Rakesh Kumar** at [Beyond Marks AI Academy](https://beyondmarks.ai).
+<!-- beyond-marks-credit:end -->
